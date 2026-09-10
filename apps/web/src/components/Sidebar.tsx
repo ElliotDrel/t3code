@@ -168,6 +168,11 @@ import {
   snoozeWakeLabel,
   type SnoozePreset,
 } from "./Sidebar.snooze";
+import {
+  openOnHostLabel,
+  showPullRequestLinkContextMenu,
+} from "./pullRequest/pullRequestLinkContextMenu";
+import { useUnlinkThreadPullRequest } from "./pullRequest/useUnlinkThreadPullRequest";
 import { ProjectFavicon } from "./ProjectFavicon";
 import { ProviderInstanceIcon } from "./chat/ProviderInstanceIcon";
 import { getTriggerDisplayModelLabel } from "./chat/providerIconUtils";
@@ -794,6 +799,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const lastVisitedAt = useUiStateStore((state) => state.threadLastVisitedAtById[threadKey]);
   const isSelected = useThreadSelectionStore((state) => state.selectedThreadKeys.has(threadKey));
   const openPrLink = useOpenPrLink();
+  const unlinkThreadPullRequest = useUnlinkThreadPullRequest(threadRef);
   const runningTerminalIds = useThreadRunningTerminalIds({
     environmentId: thread.environmentId,
     threadId: thread.id,
@@ -1117,6 +1123,25 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     },
     [onThreadActivate, openPrLink, openPullRequestsInRightPanel, pr, props.isActive, threadRef],
   );
+  // Right-clicking the number reaches the pull request itself. Without this the event bubbles to
+  // the row and opens the thread menu, which is why the link a thread settles on had nowhere to be
+  // undone except the message the agent originally wrote it in.
+  const handlePrContextMenu = useCallback(
+    (event: ReactMouseEvent) => {
+      if (!pr?.url) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void showPullRequestLinkContextMenu({
+        url: pr.url,
+        openLabel: openOnHostLabel(prProvider?.kind ?? ""),
+        position: { x: event.clientX, y: event.clientY },
+        // Only the linked number can be unlinked: the same badge also shows a pull request read
+        // off the thread's branch, and that one is a fact about git, not a choice to undo.
+        unlinkFromThread: thread.linkedPullRequest == null ? null : unlinkThreadPullRequest,
+      });
+    },
+    [pr, prProvider, thread.linkedPullRequest, unlinkThreadPullRequest],
+  );
 
   // All sidebar rows share one surface model. Live threads used to look
   // like elevated cards while settled threads were plain rows, leaving neither
@@ -1191,6 +1216,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
         rel="noopener noreferrer"
         onPointerDown={(event) => event.stopPropagation()}
         onClick={handlePrClick}
+        onContextMenu={handlePrContextMenu}
         className={cn(
           // Sidebar chrome follows the interface font; tabular digits keep the
           // number from reflowing as PR states stream in.

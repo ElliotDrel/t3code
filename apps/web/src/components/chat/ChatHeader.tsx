@@ -23,6 +23,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import GitActionsControl from "../GitActionsControl";
+import { ThreadPullRequestPill } from "../pullRequest/ThreadPullRequestPill";
 import { isTrailingDoubleClick } from "../Sidebar.logic";
 import { type DraftId } from "~/composerDraftStore";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -403,11 +404,14 @@ export const ChatHeader = memo(function ChatHeader({
         {activeProjectName && (
           <GitActionsControl
             gitCwd={gitCwd}
-            activeThreadRef={scopeThreadRef(activeThreadEnvironmentId, activeThreadId)}
+            activeThreadRef={activeThreadRef}
             onOpenPullRequest={onOpenPullRequest}
             {...(draftId ? { draftId } : {})}
           />
         )}
+        {/* Beside the git actions rather than among them: it reports what this thread is tied to,
+            and it is the only place in the thread that says so. Renders nothing when unlinked. */}
+        <ThreadPullRequestPill threadRef={activeThreadRef} />
       </div>
     </div>
   );

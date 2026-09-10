@@ -22,6 +22,11 @@ import {
   ThreadWorktreeIndicator,
   useLinkedThreadPullRequest,
 } from "./ThreadStatusIndicators";
+import {
+  openOnHostLabel,
+  showPullRequestLinkContextMenu,
+} from "./pullRequest/pullRequestLinkContextMenu";
+import { useUnlinkThreadPullRequest } from "./pullRequest/useUnlinkThreadPullRequest";
 import { ProjectFavicon } from "./ProjectFavicon";
 import { useAtomValue } from "@effect/atom-react";
 import { autoAnimate } from "@formkit/auto-animate";
@@ -462,6 +467,7 @@ export const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThr
     thread.environmentId,
     thread.linkedPullRequest,
   );
+  const unlinkThreadPullRequest = useUnlinkThreadPullRequest(threadRef);
   const pr =
     thread.linkedPullRequest == null
       ? resolveThreadPr({ threadBranch: thread.branch, gitStatus: gitStatus.data })
@@ -469,6 +475,24 @@ export const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThr
   const prStatus = prStatusIndicator(
     pr,
     linkedPullRequestStatus?.sourceControlProvider ?? gitStatus.data?.sourceControlProvider,
+  );
+  // Same gesture as the current sidebar's number: without it the right-click bubbles to the row
+  // and offers the thread menu, which has nothing to say about the pull request under the cursor.
+  const prSourceControlProvider =
+    linkedPullRequestStatus?.sourceControlProvider ?? gitStatus.data?.sourceControlProvider;
+  const handlePrContextMenu = useCallback(
+    (event: React.MouseEvent) => {
+      if (!prStatus) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void showPullRequestLinkContextMenu({
+        url: prStatus.url,
+        openLabel: openOnHostLabel(prSourceControlProvider?.kind ?? ""),
+        position: { x: event.clientX, y: event.clientY },
+        unlinkFromThread: thread.linkedPullRequest == null ? null : unlinkThreadPullRequest,
+      });
+    },
+    [prSourceControlProvider, prStatus, thread.linkedPullRequest, unlinkThreadPullRequest],
   );
   const terminalStatus = terminalStatusFromRunningIds(runningTerminalIds);
   const isConfirmingArchive = confirmingArchiveThreadKey === threadKey && !isThreadRunning;
@@ -713,6 +737,7 @@ export const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThr
                     className={`inline-flex items-center justify-center ${prStatus.colorClass} cursor-pointer rounded-sm outline-hidden focus-visible:ring-1 focus-visible:ring-ring`}
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={handlePrClick}
+                    onContextMenu={handlePrContextMenu}
                   >
                     <ChangeRequestStatusIcon className="size-3" />
                   </a>
