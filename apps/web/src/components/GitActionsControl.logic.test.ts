@@ -33,7 +33,7 @@ function status(overrides: Partial<VcsStatusResult> = {}): VcsStatusResult {
 }
 
 describe("when: ref is clean and has an open PR", () => {
-  it("resolveQuickAction opens the existing PR", () => {
+  it("has nothing left to do, and says where the pull request is", () => {
     const quick = resolveQuickAction(
       status({
         pr: {
@@ -47,7 +47,12 @@ describe("when: ref is clean and has an open PR", () => {
       }),
       false,
     );
-    assert.deepInclude(quick, { kind: "open_pr", label: "View PR", disabled: false });
+    assert.deepInclude(quick, {
+      kind: "show_hint",
+      label: "Push",
+      disabled: true,
+      hint: "Everything is pushed. The pull request is on the header's own button.",
+    });
   });
 
   it("buildMenuItems disables commit/push and enables open PR", () => {
@@ -80,13 +85,6 @@ describe("when: ref is clean and has an open PR", () => {
         icon: "push",
         kind: "open_dialog",
         dialogAction: "push",
-      },
-      {
-        id: "pr",
-        label: "View PR",
-        disabled: false,
-        icon: "pr",
-        kind: "open_pr",
       },
     ]);
   });
@@ -121,14 +119,6 @@ describe("when: actions are busy", () => {
         icon: "push",
         kind: "open_dialog",
         dialogAction: "push",
-      },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: true,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
       },
     ]);
   });
@@ -202,24 +192,17 @@ describe("when: ref is clean, ahead, and has an open PR", () => {
         kind: "open_dialog",
         dialogAction: "push",
       },
-      {
-        id: "pr",
-        label: "View PR",
-        disabled: false,
-        icon: "pr",
-        kind: "open_pr",
-      },
     ]);
   });
 });
 
 describe("when: ref is clean, ahead, and has no open PR", () => {
-  it("resolveQuickAction pushes and creates a PR", () => {
+  it("pushes, and leaves opening the pull request to the header's pill", () => {
     const quick = resolveQuickAction(status({ aheadCount: 2, pr: null }), false);
     assert.deepInclude(quick, {
       kind: "run_action",
-      action: "create_pr",
-      label: "Push & create PR",
+      action: "push",
+      label: "Push",
     });
   });
 
@@ -242,46 +225,42 @@ describe("when: ref is clean, ahead, and has no open PR", () => {
         kind: "open_dialog",
         dialogAction: "push",
       },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: false,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
-      },
     ]);
   });
 });
 
 describe("when: source control provider uses merge requests", () => {
-  it("uses GitLab MR terminology in quick actions and menu items", () => {
-    const gitlabStatus = status({
-      aheadCount: 2,
-      sourceControlProvider: {
-        kind: "gitlab",
-        name: "GitLab",
-        baseUrl: "https://gitlab.com",
-      },
-    });
+  const gitlab = {
+    kind: "gitlab",
+    name: "GitLab",
+    baseUrl: "https://gitlab.com",
+  } as const;
 
-    const quick = resolveQuickAction(gitlabStatus, false);
-    const items = buildMenuItems(gitlabStatus, false);
+  it("moves a ref without naming the change request at all", () => {
+    const quick = resolveQuickAction(
+      status({ aheadCount: 2, sourceControlProvider: gitlab }),
+      false,
+    );
+
+    assert.deepInclude(quick, { kind: "run_action", action: "push", label: "Push" });
+  });
+
+  it("names the host's own word where it points at the header's pill", () => {
+    const quick = resolveQuickAction(
+      status({ aheadOfDefaultCount: 2, sourceControlProvider: gitlab }),
+      false,
+    );
 
     assert.deepInclude(quick, {
-      kind: "run_action",
-      action: "create_pr",
-      label: "Push & create MR",
-    });
-    assert.deepInclude(items[2], {
-      id: "pr",
-      label: "Create MR",
+      kind: "show_hint",
+      disabled: true,
+      hint: "Everything is pushed. Open a merge request from the header's own button.",
     });
   });
 });
 
 describe("when: ref is clean, up to date, and has no open PR", () => {
-  it("enables create PR when synced with upstream but ahead of default", () => {
+  it("points at the header's pill when synced with upstream but ahead of default", () => {
     const syncedFeature = status({
       aheadCount: 0,
       behindCount: 0,
@@ -291,14 +270,17 @@ describe("when: ref is clean, up to date, and has no open PR", () => {
 
     const quick = resolveQuickAction(syncedFeature, false);
     assert.deepInclude(quick, {
-      label: "Create PR",
-      disabled: false,
-      kind: "run_action",
-      action: "create_pr",
+      label: "Push",
+      disabled: true,
+      kind: "show_hint",
+      hint: "Everything is pushed. Open a pull request from the header's own button.",
     });
 
     const items = buildMenuItems(syncedFeature, false);
-    assert.equal(items.find((item) => item.id === "pr")?.disabled, false);
+    assert.deepEqual(
+      items.map((item) => item.id),
+      ["commit", "push"],
+    );
   });
 
   it("resolveQuickAction returns disabled no-action state", () => {
@@ -327,14 +309,6 @@ describe("when: ref is clean, up to date, and has no open PR", () => {
         icon: "push",
         kind: "open_dialog",
         dialogAction: "push",
-      },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: true,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
       },
     ]);
   });
@@ -365,14 +339,6 @@ describe("when: ref is behind upstream", () => {
         kind: "open_dialog",
         dialogAction: "push",
       },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: true,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
-      },
     ]);
   });
 });
@@ -390,12 +356,12 @@ describe("when: ref has diverged from upstream", () => {
 });
 
 describe("when: working tree has local changes", () => {
-  it("resolveQuickAction returns commit, push, and create PR", () => {
+  it("resolveQuickAction returns commit and push", () => {
     const quick = resolveQuickAction(status({ hasWorkingTreeChanges: true }), false);
     assert.deepInclude(quick, {
       kind: "run_action",
-      action: "commit_push_pr",
-      label: "Commit, push & PR",
+      action: "commit_push",
+      label: "Commit & push",
     });
   });
 
@@ -455,14 +421,6 @@ describe("when: working tree has local changes", () => {
         kind: "open_dialog",
         dialogAction: "push",
       },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: true,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
-      },
     ]);
   });
 
@@ -496,14 +454,6 @@ describe("when: working tree has local changes", () => {
         icon: "push",
         kind: "open_dialog",
         dialogAction: "push",
-      },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: true,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
       },
     ]);
   });
@@ -540,15 +490,15 @@ describe("when: on default ref without open PR", () => {
 });
 
 describe("when: working tree has local changes and ref is behind upstream", () => {
-  it("resolveQuickAction still prefers commit, push, and create PR", () => {
+  it("resolveQuickAction still prefers commit and push", () => {
     const quick = resolveQuickAction(
       status({ hasWorkingTreeChanges: true, behindCount: 1 }),
       false,
     );
     assert.deepInclude(quick, {
       kind: "run_action",
-      action: "commit_push_pr",
-      label: "Commit, push & PR",
+      action: "commit_push",
+      label: "Commit & push",
     });
   });
 
@@ -570,14 +520,6 @@ describe("when: working tree has local changes and ref is behind upstream", () =
         icon: "push",
         kind: "open_dialog",
         dialogAction: "push",
-      },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: true,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
       },
     ]);
   });
@@ -611,14 +553,6 @@ describe("when: HEAD is detached and there are no local changes", () => {
         kind: "open_dialog",
         dialogAction: "push",
       },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: true,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
-      },
     ]);
   });
 });
@@ -637,7 +571,7 @@ describe("when: ref has no upstream configured", () => {
     });
   });
 
-  it("resolveQuickAction opens PR when clean, no upstream, no local commits are ahead, and PR exists", () => {
+  it("says where the pull request is when clean, unpublished, and one already exists", () => {
     const quick = resolveQuickAction(
       status({
         hasUpstream: false,
@@ -652,11 +586,14 @@ describe("when: ref has no upstream configured", () => {
         },
       }),
       false,
+      false,
+      false,
     );
     assert.deepInclude(quick, {
-      kind: "open_pr",
-      label: "View PR",
-      disabled: false,
+      kind: "show_hint",
+      label: "Push",
+      disabled: true,
+      hint: "Nothing to push. The pull request is on the header's own button.",
     });
   });
 
@@ -703,18 +640,10 @@ describe("when: ref has no upstream configured", () => {
         kind: "open_dialog",
         dialogAction: "push",
       },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: true,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
-      },
     ]);
   });
 
-  it("resolveQuickAction runs push and create PR when no upstream and commits are ahead", () => {
+  it("resolveQuickAction runs push when no upstream and commits are ahead", () => {
     const quick = resolveQuickAction(
       status({
         hasUpstream: false,
@@ -725,8 +654,8 @@ describe("when: ref has no upstream configured", () => {
     );
     assert.deepInclude(quick, {
       kind: "run_action",
-      action: "create_pr",
-      label: "Push & create PR",
+      action: "push",
+      label: "Push",
       disabled: false,
     });
   });
@@ -767,14 +696,6 @@ describe("when: ref has no upstream configured", () => {
         icon: "push",
         kind: "open_dialog",
         dialogAction: "push",
-      },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: false,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
       },
     ]);
   });
@@ -861,14 +782,6 @@ describe("when: ref has no upstream configured", () => {
         icon: "push",
         kind: "open_dialog",
         dialogAction: "push",
-      },
-      {
-        id: "pr",
-        label: "Create PR",
-        disabled: true,
-        icon: "pr",
-        kind: "open_dialog",
-        dialogAction: "create_pr",
       },
     ]);
   });
