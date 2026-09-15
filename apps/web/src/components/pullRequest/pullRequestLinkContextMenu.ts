@@ -64,8 +64,11 @@ export async function showPullRequestLinkContextMenu({
   /**
    * Absent where the number being right-clicked is not the one its thread is linked to — a pull
    * request read off a branch, a row on the list page, a server that does not record links at all.
+   *
+   * Handed the URL the menu was opened on, so it can decline once that is no longer the link the
+   * thread holds.
    */
-  readonly unlinkFromThread?: (() => Promise<void>) | null | undefined;
+  readonly unlinkFromThread?: ((url: string) => Promise<void>) | null | undefined;
 }): Promise<void> {
   const api = readLocalApi();
   if (!api) return;
@@ -83,7 +86,7 @@ export async function showPullRequestLinkContextMenu({
   try {
     if (action === "copy-link") await writeTextToClipboard(url, "link");
     else if (action === "open-external") await api.shell.openExternal(url);
-    else if (action === "unlink-from-thread") await unlinkFromThread?.();
+    else if (action === "unlink-from-thread") await unlinkFromThread?.(url);
   } catch {
     toastManager.add({
       type: "error",

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { openOnHostLabel, pullRequestLinkContextMenuItems } from "./pullRequestLinkContextMenu";
+import {
+  openOnHostLabel,
+  pullRequestLinkContextMenuItems,
+  showPullRequestLinkContextMenu,
+} from "./pullRequestLinkContextMenu";
 
 describe("pull request link context menu", () => {
   it("offers the copy first and the host's own page after it", () => {
@@ -26,6 +30,28 @@ describe("pull request link context menu", () => {
       { id: "open-external", label: "Open on GitHub" },
       { id: "unlink-from-thread", label: "Unlink from thread", separatorBefore: true },
     ]);
+  });
+
+  it("tells the unlink callback which url was acted on, so a stale menu can decline", async () => {
+    const acted: string[] = [];
+    // These suites run on node, so the desktop bridge the menu reaches for is stood up here
+    // rather than in a DOM. Only `contextMenu.show` is exercised, and it answers from the bridge.
+    const globals = globalThis as { window?: unknown };
+    const previousWindow = globals.window;
+    globals.window = { desktopBridge: { showContextMenu: async () => "unlink-from-thread" } };
+    try {
+      await showPullRequestLinkContextMenu({
+        url: "https://github.com/pingdotgg/t3code/pull/23",
+        openLabel: "Open on GitHub",
+        position: { x: 0, y: 0 },
+        unlinkFromThread: async (url) => {
+          acted.push(url);
+        },
+      });
+    } finally {
+      globals.window = previousWindow;
+    }
+    expect(acted).toEqual(["https://github.com/pingdotgg/t3code/pull/23"]);
   });
 
   it("names every host it knows, and says nothing false about one it does not", () => {
