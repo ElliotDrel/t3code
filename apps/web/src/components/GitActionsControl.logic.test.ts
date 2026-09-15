@@ -51,7 +51,7 @@ describe("when: ref is clean and has an open PR", () => {
       kind: "show_hint",
       label: "Push",
       disabled: true,
-      hint: "Everything is pushed. The pull request is on the header's own button.",
+      hint: "Everything is pushed. This ref already has an open pull request.",
     });
   });
 
@@ -255,6 +255,29 @@ describe("when: source control provider uses merge requests", () => {
       kind: "show_hint",
       disabled: true,
       hint: "Everything is pushed. Open a merge request from the header's own button.",
+    });
+  });
+
+  it("names the host's own word when reporting one the ref already has", () => {
+    const quick = resolveQuickAction(
+      status({
+        sourceControlProvider: gitlab,
+        pr: {
+          number: 30,
+          title: "Open MR",
+          url: "https://gitlab.com/g/p/-/merge_requests/30",
+          baseRef: "main",
+          headRef: "feature/test",
+          state: "open",
+        },
+      }),
+      false,
+    );
+
+    assert.deepInclude(quick, {
+      kind: "show_hint",
+      disabled: true,
+      hint: "Everything is pushed. This ref already has an open merge request.",
     });
   });
 });
@@ -571,7 +594,7 @@ describe("when: ref has no upstream configured", () => {
     });
   });
 
-  it("says where the pull request is when clean, unpublished, and one already exists", () => {
+  it("reports the existing pull request when clean, unpublished, and one already exists", () => {
     const quick = resolveQuickAction(
       status({
         hasUpstream: false,
@@ -593,7 +616,7 @@ describe("when: ref has no upstream configured", () => {
       kind: "show_hint",
       label: "Push",
       disabled: true,
-      hint: "Nothing to push. The pull request is on the header's own button.",
+      hint: "Nothing to push. This ref already has an open pull request.",
     });
   });
 

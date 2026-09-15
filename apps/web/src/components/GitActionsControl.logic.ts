@@ -194,7 +194,7 @@ export function resolveQuickAction(
           label: "Push",
           disabled: true,
           kind: "show_hint",
-          hint: `Nothing to push. The ${terminology.singular} is on the header's own button.`,
+          hint: `Nothing to push. This ref already has an open ${terminology.singular}.`,
         };
       }
       return {
@@ -245,14 +245,18 @@ export function resolveQuickAction(
     };
   }
 
-  // Nothing left to move. Where a change request could still be opened or read, the hint points at
-  // the control that does it rather than leaving "no action needed" over work that is not finished.
+  // Nothing left to move. Where a change request could still be opened or read, the hint says so
+  // rather than leaving "no action needed" over work that is not finished.
+  //
+  // An existing one is reported as a fact about the ref, not as a place to click. The header's pill
+  // shows the thread's own pull request, and a ref can carry one the thread never linked, so
+  // pointing at the pill here would sometimes name a button that is not on screen.
   if (hasOpenPr) {
     return {
       label: "Push",
       disabled: true,
       kind: "show_hint",
-      hint: `Everything is pushed. The ${terminology.singular} is on the header's own button.`,
+      hint: `Everything is pushed. This ref already has an open ${terminology.singular}.`,
     };
   }
 
