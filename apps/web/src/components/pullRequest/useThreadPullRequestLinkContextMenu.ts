@@ -1,7 +1,7 @@
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { useCallback, type MouseEvent as ReactMouseEvent } from "react";
 
-import { usePullRequestLinking } from "~/hooks/usePullRequestLinking";
+import { useLazyPullRequestLinking } from "~/hooks/usePullRequestLinking";
 import { readThreadShell } from "~/state/entities";
 
 import { openOnHostLabel, showPullRequestLinkContextMenu } from "./pullRequestLinkContextMenu";
@@ -17,10 +17,11 @@ import { openOnHostLabel, showPullRequestLinkContextMenu } from "./pullRequestLi
  *
  * Whether the thread is linked is read when the menu opens, and again when the item is chosen: a
  * menu sits open for as long as it takes to read, and the agent can link or unlink from underneath
- * it in that time.
+ * it in that time. That same lateness is why the linking state is resolved per click here rather
+ * than subscribed to: this hook is mounted once per row of the thread list.
  */
 export function useThreadPullRequestLinkContextMenu(threadRef: ScopedThreadRef | null | undefined) {
-  const pullRequestLinking = usePullRequestLinking(threadRef?.environmentId);
+  const resolvePullRequestLinking = useLazyPullRequestLinking(threadRef?.environmentId);
   return useCallback(
     (
       event: ReactMouseEvent,
@@ -33,8 +34,8 @@ export function useThreadPullRequestLinkContextMenu(threadRef: ScopedThreadRef |
       if (url === undefined) return;
       event.preventDefault();
       event.stopPropagation();
-      const linked =
-        threadRef != null && pullRequestLinking.isLinked(readThreadShell(threadRef), url);
+      const linking = resolvePullRequestLinking();
+      const linked = threadRef != null && linking.isLinked(readThreadShell(threadRef), url);
       void showPullRequestLinkContextMenu({
         url,
         openLabel: openOnHostLabel(pullRequest.providerKind ?? ""),
@@ -45,13 +46,14 @@ export function useThreadPullRequestLinkContextMenu(threadRef: ScopedThreadRef |
         ...(linked && threadRef != null
           ? {
               unlinkFromThread: async (target: string) => {
-                if (!pullRequestLinking.isLinked(readThreadShell(threadRef), target)) return;
-                await pullRequestLinking.changeLink(threadRef, target, false);
+                const current = resolvePullRequestLinking();
+                if (!current.isLinked(readThreadShell(threadRef), target)) return;
+                await current.changeLink(threadRef, target, false);
               },
             }
           : {}),
       });
     },
-    [pullRequestLinking, threadRef],
+    [resolvePullRequestLinking, threadRef],
   );
 }

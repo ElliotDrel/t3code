@@ -1,4 +1,5 @@
 import type { ContextMenuItem } from "@t3tools/contracts";
+import { parseChangeRequestUrl } from "@t3tools/shared/changeRequestUrl";
 
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { readLocalApi } from "~/localApi";
@@ -25,17 +26,21 @@ export const openOnHostLabel = (provider: string): string =>
  * Unlinking comes last, behind a divider, because it is the one item here that changes the thread
  * rather than the clipboard or the browser, and a misclick on it is the only one that costs
  * anything.
+ *
+ * It also names its number, which the other two do not need to: the badge a reader right-clicks is
+ * sometimes an aggregate that reads `+3` instead of a number, and the link on that badge is only
+ * one of the three. The menu says which one is about to go.
  */
 function pullRequestLinkContextMenuItems(
   openLabel: string,
-  canUnlinkFromThread: boolean,
+  unlinkLabel: string | null,
 ): readonly ContextMenuItem<PullRequestLinkContextMenuAction>[] {
   const items: ContextMenuItem<PullRequestLinkContextMenuAction>[] = [
     { id: "copy-link", label: "Copy link", icon: "copy" },
     { id: "open-external", label: openLabel },
   ];
-  if (canUnlinkFromThread) {
-    items.push({ id: "unlink-from-thread", label: "Unlink from thread", separatorBefore: true });
+  if (unlinkLabel !== null) {
+    items.push({ id: "unlink-from-thread", label: unlinkLabel, separatorBefore: true });
   }
   return items;
 }
@@ -70,10 +75,17 @@ export async function showPullRequestLinkContextMenu({
 }): Promise<void> {
   const api = readLocalApi();
   if (!api) return;
+  const number = parseChangeRequestUrl(url)?.number;
+  const unlinkLabel =
+    unlinkFromThread === undefined
+      ? null
+      : number === undefined
+        ? "Unlink from thread"
+        : `Unlink #${number} from thread`;
   let action: PullRequestLinkContextMenuAction | null = null;
   try {
     action = await api.contextMenu.show(
-      pullRequestLinkContextMenuItems(openLabel, unlinkFromThread !== undefined),
+      pullRequestLinkContextMenuItems(openLabel, unlinkLabel),
       position,
     );
   } catch {

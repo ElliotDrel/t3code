@@ -21,6 +21,7 @@ const URL = "https://github.com/pingdotgg/t3code/pull/23";
 async function openMenu(
   options: {
     readonly unlinkFromThread?: ((url: string) => Promise<void>) | undefined;
+    readonly url?: string;
   },
   choose: PullRequestLinkContextMenuAction | null = null,
 ): Promise<Items> {
@@ -37,7 +38,7 @@ async function openMenu(
   };
   try {
     await showPullRequestLinkContextMenu({
-      url: URL,
+      url: options.url ?? URL,
       openLabel: "Open on GitHub",
       position: { x: 0, y: 0 },
       ...(options.unlinkFromThread ? { unlinkFromThread: options.unlinkFromThread } : {}),
@@ -68,8 +69,20 @@ describe("pull request link context menu", () => {
     expect(await openMenu({ unlinkFromThread: async () => {} })).toEqual([
       { id: "copy-link", label: "Copy link", icon: "copy" },
       { id: "open-external", label: "Open on GitHub" },
-      { id: "unlink-from-thread", label: "Unlink from thread", separatorBefore: true },
+      { id: "unlink-from-thread", label: "Unlink #23 from thread", separatorBefore: true },
     ]);
+  });
+
+  it("falls back to the bare label for a url it cannot read a number out of", async () => {
+    const items = await openMenu({
+      url: "https://example.com/some/page",
+      unlinkFromThread: async () => {},
+    });
+    expect(items.at(-1)).toEqual({
+      id: "unlink-from-thread",
+      label: "Unlink from thread",
+      separatorBefore: true,
+    });
   });
 
   it("tells the unlink callback which url was acted on, so a stale menu can decline", async () => {
