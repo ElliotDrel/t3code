@@ -5,7 +5,7 @@ import { readLocalApi } from "~/localApi";
 
 import { toastManager } from "../ui/toast";
 
-export type PullRequestLinkContextMenuAction = "copy-link" | "open-external";
+export type PullRequestLinkContextMenuAction = "copy-link" | "open-external" | "unlink-from-thread";
 
 /** Named for the host rather than "externally": the point is where you will land. */
 const OPEN_ON_HOST_LABELS: Partial<Record<string, string>> = {
@@ -19,14 +19,25 @@ const OPEN_ON_HOST_LABELS: Partial<Record<string, string>> = {
 export const openOnHostLabel = (provider: string): string =>
   OPEN_ON_HOST_LABELS[provider] ?? "Open on host";
 
-/** Copy first: it is the reason to right-click a number rather than click it. */
+/**
+ * Copy first: it is the reason to right-click a number rather than click it.
+ *
+ * Unlinking comes last, behind a divider, because it is the one item here that changes the thread
+ * rather than the clipboard or the browser, and a misclick on it is the only one that costs
+ * anything.
+ */
 function pullRequestLinkContextMenuItems(
   openLabel: string,
+  canUnlinkFromThread: boolean,
 ): readonly ContextMenuItem<PullRequestLinkContextMenuAction>[] {
-  return [
+  const items: ContextMenuItem<PullRequestLinkContextMenuAction>[] = [
     { id: "copy-link", label: "Copy link", icon: "copy" },
     { id: "open-external", label: openLabel },
   ];
+  if (canUnlinkFromThread) {
+    items.push({ id: "unlink-from-thread", label: "Unlink from thread", separatorBefore: true });
+  }
+  return items;
 }
 
 /**
@@ -42,16 +53,29 @@ export async function showPullRequestLinkContextMenu({
   url,
   openLabel,
   position,
+  unlinkFromThread,
 }: {
   readonly url: string;
   readonly openLabel: string;
   readonly position: { readonly x: number; readonly y: number };
+  /**
+   * Absent wherever this number is not one the thread is linked to: a pull request read off a
+   * branch, a row on the list page, a server too old to record links at all.
+   *
+   * Handed the URL the menu was opened on, so it can decline once that is no longer a link the
+   * thread holds. A menu stays open for as long as it takes to read, and in that time the agent
+   * can link or unlink from the same thread.
+   */
+  readonly unlinkFromThread?: ((url: string) => Promise<void>) | undefined;
 }): Promise<void> {
   const api = readLocalApi();
   if (!api) return;
   let action: PullRequestLinkContextMenuAction | null = null;
   try {
-    action = await api.contextMenu.show(pullRequestLinkContextMenuItems(openLabel), position);
+    action = await api.contextMenu.show(
+      pullRequestLinkContextMenuItems(openLabel, unlinkFromThread !== undefined),
+      position,
+    );
   } catch {
     // A menu that could not be shown has already cost the reader their right-click; there is
     // nothing to say about it that a second popup would not make worse.
@@ -60,10 +84,16 @@ export async function showPullRequestLinkContextMenu({
   try {
     if (action === "copy-link") await writeTextToClipboard(url, "link");
     else if (action === "open-external") await api.shell.openExternal(url);
+    else if (action === "unlink-from-thread") await unlinkFromThread?.(url);
   } catch {
     toastManager.add({
       type: "error",
-      title: action === "copy-link" ? "Could not copy the link" : "Could not open the link",
+      title:
+        action === "copy-link"
+          ? "Could not copy the link"
+          : action === "unlink-from-thread"
+            ? "Could not unlink the pull request"
+            : "Could not open the link",
     });
   }
 }

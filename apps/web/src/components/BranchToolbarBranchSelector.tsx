@@ -58,6 +58,7 @@ import {
   resolveThreadPullRequestBadge,
   useLinkedThreadPullRequest,
 } from "./ThreadStatusIndicators";
+import { useThreadPullRequestLinkContextMenu } from "./pullRequest/useThreadPullRequestLinkContextMenu";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
 import { getVirtualizedScrollFadeClassName } from "./ui/scroll-area";
@@ -671,6 +672,7 @@ export function BranchToolbarBranchSelector({
   const prNumber = currentLinkedPr?.number ?? displayedPr?.number;
   const prUrl = currentLinkedPr?.url ?? displayedPr?.url;
   const openPrLink = useOpenPrLink(threadRef);
+  const openPrContextMenu = useThreadPullRequestLinkContextMenu(threadRef);
 
   function renderPickerItem(itemValue: string, index: number) {
     if (checkoutPullRequestItemValue && itemValue === checkoutPullRequestItemValue) {
@@ -783,6 +785,14 @@ export function BranchToolbarBranchSelector({
           onOpenPullRequest={(event) => {
             if (prUrl) openPrLink(event, prUrl);
           }}
+          onContextMenuPullRequest={(event) =>
+            openPrContextMenu(event, {
+              url: prUrl,
+              providerKind:
+                linkedStatus?.sourceControlProvider.kind ??
+                branchStatusQuery.data?.sourceControlProvider?.kind,
+            })
+          }
         />
         {/* Context menu lives on the wrapper: the disabled Button has
             pointer-events-none, so the trigger itself never sees right-clicks

@@ -146,6 +146,7 @@ export function ThreadPullRequestBadgeControl({
   status,
   onOpenStack,
   onOpenPullRequest,
+  onContextMenuPullRequest,
 }: {
   variant: "underline" | "ghost";
   badge: ThreadPullRequestBadge | null;
@@ -154,6 +155,8 @@ export function ThreadPullRequestBadgeControl({
   status: PrStatusIndicator | null;
   onOpenStack: () => void;
   onOpenPullRequest: (event: MouseEvent<HTMLAnchorElement>) => void;
+  /** Only the single-pull-request shape carries one; a stack has no one number to act on. */
+  onContextMenuPullRequest?: ((event: MouseEvent<HTMLAnchorElement>) => void) | undefined;
 }) {
   const isStack = badge?.kind === "stack";
   const linkedCount = badge?.kind === "pull-request" && badge.others > 0 ? badge.others + 1 : null;
@@ -206,6 +209,7 @@ export function ThreadPullRequestBadgeControl({
               aria-label={label}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={onOpenPullRequest}
+              {...(onContextMenuPullRequest ? { onContextMenu: onContextMenuPullRequest } : {})}
             />
           )
         }
